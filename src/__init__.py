@@ -73,7 +73,7 @@ def setup_file_logging():
 
         # Add file handler to all Migaku loggers
         migaku_logger.addHandler(file_handler)
-        migaku_logger.setLevel(logging.INFO)  # Set to DEBUG for verbose logging
+        migaku_logger.setLevel(logging.DEBUG)  # Set to DEBUG for verbose logging
 
         # Flush buffered logs to file if we had a memory buffer
         if _early_log_buffer:
@@ -92,7 +92,7 @@ def setup_file_logging():
 
 # Set up memory buffer to capture early logs before profile is loaded
 migaku_logger = logging.getLogger('migaku')
-migaku_logger.setLevel(logging.INFO)
+migaku_logger.setLevel(logging.DEBUG)
 _early_log_buffer = MemoryHandler(capacity=1000, flushLevel=logging.ERROR)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 _early_log_buffer.setFormatter(formatter)
