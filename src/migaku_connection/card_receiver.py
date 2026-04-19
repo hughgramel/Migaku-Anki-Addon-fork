@@ -21,7 +21,15 @@ logger = logging.getLogger("migaku.connection.card_receiver")
 class CardReceiver(MigakuHTTPHandler):
     def post(self: RequestHandler):
         try:
-            body = json.loads(self.request.body)
+            raw_body = self.request.body
+            logger.debug(f"[DEBUG-PAYLOAD] Raw request body from {self.request.remote_ip}: {raw_body!r}")
+            body = json.loads(raw_body)
+            logger.debug(f"[DEBUG-PAYLOAD] Parsed top-level keys: {sorted(body.keys())}")
+            for k, v in body.items():
+                preview = repr(v)
+                if len(preview) > 500:
+                    preview = preview[:500] + f"... (truncated, total len={len(preview)})"
+                logger.debug(f"[DEBUG-PAYLOAD]   {k} = {preview}")
             card = card_fields_from_dict(body)
             logger.debug(f"Received card creation request from {self.request.remote_ip}")
             self.create_card(card)
