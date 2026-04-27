@@ -670,6 +670,111 @@ class CondensedAudioWidget(SettingsWidget):
             self.dir_label.setText(new_dir)
 
 
+class WordAlignmentWidget(SettingsWidget):
+    TITLE = "Word Alignment (wav2vec2)"
+
+    LANGUAGES = [
+        ("(auto from extension)", ""),
+        ("Spanish", "es"),
+        ("French", "fr"),
+        ("German", "de"),
+        ("Italian", "it"),
+        ("Portuguese", "pt"),
+        ("Dutch", "nl"),
+        ("Polish", "pl"),
+        ("Russian", "ru"),
+        ("Japanese", "ja"),
+        ("Chinese", "zh"),
+        ("Korean", "ko"),
+        ("English", "en"),
+    ]
+
+    def init_ui(self):
+        self.add_label(
+            "Run wav2vec2 forced alignment on each Migaku audio clip and write per-word "
+            "timings into a card field. Use it to underline the active word as the "
+            "audio plays.<br><br>"
+            "<b>One-time setup:</b> install whisperx in a separate Python — "
+            "<code>pipx install whisperx</code> works on macOS / Linux. Then paste the "
+            "path to that Python below."
+        )
+
+        self.enabled = QCheckBox("Enable word alignment for incoming Migaku cards")
+        self.enabled.setChecked(config.get("align_enabled", False))
+        self.enabled.toggled.connect(
+            lambda checked: config.set("align_enabled", checked)
+        )
+        self.lyt.addWidget(self.enabled)
+
+        self.add_label("<hr>")
+        self.add_label("<b>Path to Python with whisperx installed</b>")
+        path_lyt = QHBoxLayout()
+        self.path_edit = QLineEdit(config.get("align_python_path", ""))
+        self.path_edit.setPlaceholderText("/Users/you/.local/pipx/venvs/whisperx/bin/python")
+        self.path_edit.editingFinished.connect(
+            lambda: config.set("align_python_path", self.path_edit.text().strip())
+        )
+        path_btn = QPushButton("Browse…")
+        path_btn.clicked.connect(self.pick_python)
+        path_lyt.addWidget(self.path_edit)
+        path_lyt.addWidget(path_btn)
+        self.lyt.addLayout(path_lyt)
+
+        self.add_label(
+            "Tip: <code>pipx install whisperx</code> then "
+            "<code>pipx environment --value PIPX_LOCAL_VENVS</code> to find the venv path."
+        )
+
+        self.add_label("<hr>")
+        self.add_label(
+            "<b>Default language</b> — used when the Migaku payload doesn't include a "
+            "language code. Select <i>auto</i> to require a payload language and skip "
+            "alignment otherwise."
+        )
+        self.lang_combo = QComboBox()
+        for label, code in self.LANGUAGES:
+            self.lang_combo.addItem(label, code)
+        current = config.get("align_language", "")
+        idx = next(
+            (i for i, (_, c) in enumerate(self.LANGUAGES) if c == current), 0
+        )
+        self.lang_combo.setCurrentIndex(idx)
+        self.lang_combo.currentIndexChanged.connect(
+            lambda i: config.set("align_language", self.lang_combo.itemData(i) or "")
+        )
+        self.lyt.addWidget(self.lang_combo)
+
+        self.add_label("<hr>")
+        self.add_label(
+            "<b>Card field mapping</b> — in <i>Field Settings</i> for your Migaku note type, "
+            "map a field (e.g. <code>WordTimings</code>) to the <code>wordTimings</code> "
+            "data type. The field receives a JSON array: "
+            "<code>[{\"surface\":\"hola\",\"start\":0.12,\"end\":0.41}, …]</code>."
+        )
+
+        self.add_label("<hr>")
+        test_btn = QPushButton("Test alignment setup")
+        test_btn.clicked.connect(self.run_probe)
+        self.lyt.addWidget(test_btn)
+        self.probe_label = self.add_label("")
+
+    def pick_python(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Python interpreter (whisperx env)", "", ""
+        )
+        if path:
+            self.path_edit.setText(path)
+            config.set("align_python_path", path)
+
+    def run_probe(self):
+        from .migaku_connection import word_align
+
+        config.set("align_python_path", self.path_edit.text().strip())
+        ok, msg = word_align.probe()
+        color = "green" if ok else "red"
+        self.probe_label.setText(f"<span style='color:{color}'>{msg}</span>")
+
+
 SETTINGS_WIDGETS = [
     AboutWidget,
     LanguageWidget,
@@ -686,4 +791,5 @@ SETTINGS_WIDGETS = [
     MediaFileWidget,
     FieldSettingsWidget,
     CondensedAudioWidget,
+    WordAlignmentWidget,
 ]

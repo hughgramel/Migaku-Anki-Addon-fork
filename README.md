@@ -172,6 +172,93 @@ ls -la .git/hooks/pre-push
 ./install-hooks.sh
 ```
 
+## Word Alignment (wav2vec2)
+
+Optional feature: when a Migaku card lands, run **wav2vec2 forced alignment** on the sentence audio against the (known) sentence text and write per-word timings into a card field. Use the timings to underline the active word as the audio plays.
+
+Alignment runs **asynchronously** in a background thread — card creation never blocks. ~1–3 s of CPU work per 6–10 s clip on Apple Silicon. First card per language downloads a ~400 MB wav2vec2 model from HuggingFace.
+
+### One-time setup
+
+1. **Install whisperx in a separate Python.** It is not bundled — torch is too large.
+   ```bash
+   # macOS / Linux (recommended)
+   pipx install whisperx
+
+   # Find the venv path:
+   pipx environment --value PIPX_LOCAL_VENVS
+   # → /Users/you/.local/pipx/venvs   (then append /whisperx/bin/python)
+   ```
+2. **Open Anki → Tools → Migaku → Settings/Help → "Word Alignment (wav2vec2)".**
+3. Tick **Enable word alignment**.
+4. Browse to the python from step 1 (e.g. `/Users/you/.local/pipx/venvs/whisperx/bin/python`).
+5. Pick a default language (used when the Migaku payload doesn't carry one — see logging below).
+6. Click **Test alignment setup**. A green confirmation means whisperx is reachable.
+
+### Card type setup
+
+In **Settings/Help → Field Settings** for your Migaku note type, add a field (e.g. `WordTimings`) and map it to the `wordTimings` data type. The field receives a JSON array on each card:
+
+```json
+[
+  {"surface": "hola", "start": 0.12, "end": 0.41},
+  {"surface": "mundo", "start": 0.42, "end": 0.78}
+]
+```
+
+### Sample card template (highlight active word)
+
+Drop into your card's **Front** template:
+
+```html
+<div id="ts-sentence">{{Sentence}}</div>
+{{SentenceAudio}}
+<script>
+(function() {
+  const raw = `{{WordTimings}}`.trim();
+  if (!raw) return;
+  let words; try { words = JSON.parse(raw); } catch { return; }
+  const sentenceEl = document.getElementById('ts-sentence');
+  const text = sentenceEl.textContent;
+  // Naive: wrap each word in a span by surface order. Replace with your own
+  // tokenizer for CJK or punctuation-heavy text.
+  let cursor = 0;
+  const html = words.map((w, i) => {
+    const idx = text.indexOf(w.surface, cursor);
+    if (idx < 0) return null;
+    const lead = text.slice(cursor, idx);
+    cursor = idx + w.surface.length;
+    return lead + `<span data-i="${i}">${w.surface}</span>`;
+  }).filter(Boolean).join('') + text.slice(cursor);
+  sentenceEl.innerHTML = html;
+
+  const audio = document.querySelector('audio');
+  if (!audio) return;
+  audio.addEventListener('timeupdate', () => {
+    const t = audio.currentTime;
+    sentenceEl.querySelectorAll('span[data-i]').forEach(s => {
+      const w = words[+s.dataset.i];
+      s.classList.toggle('active', t >= w.start && t <= w.end);
+    });
+  });
+})();
+</script>
+<style>#ts-sentence .active { text-decoration: underline; text-decoration-thickness: 2px; }</style>
+```
+
+### Language detection
+
+The addon walks the incoming Migaku payload for a language code under common keys (`language`, `lang`, `targetLanguage`, `sourceLanguage`, `languageCode`, `langCode`, `deck_language`, `deckLanguage`) at the top level and one level into nested dicts. If none match, it uses the **default language** from settings; if that's also unset, alignment is skipped.
+
+Every received payload is logged at `INFO` to help discover Migaku's actual language key. View logs via **Tools → Migaku → Export Logs**, then grep for `[DEBUG-PAYLOAD]`.
+
+### Troubleshooting
+
+- **"whisperx not importable"** in the test probe — your selected Python doesn't have whisperx. Re-run `pipx install whisperx` and verify with `<that-python> -c "import whisperx"`.
+- **First card stalls for 30–90 s** — first-run download of the wav2vec2 model for that language. Subsequent cards are fast.
+- **Empty field after alignment** — check logs for `align:` lines. Common causes: language not detected, sentence audio not in Anki's media folder yet, sidecar timeout.
+- **Windows** — whisperx on native Windows is rough. WSL2 with Linux pipx is the smoother path.
+
 ## Release Process
 
 ### Creating a New Release

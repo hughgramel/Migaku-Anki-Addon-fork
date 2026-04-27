@@ -40,6 +40,7 @@ class CardFields:
     restImages: str = ""
     exampleSentences: str = ""
     notes: str = ""
+    wordTimings: str = ""
 
 
 def process_image_asset(image: ImageAsset):
