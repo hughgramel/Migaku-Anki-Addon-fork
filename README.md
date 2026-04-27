@@ -1,4 +1,16 @@
-# Migaku Anki
+# Migaku Anki — `hughgramel` fork
+
+> **What this fork adds:** automatic **wav2vec2 word-level alignment** on every Migaku audio clip. When the Migaku browser extension sends a card, this addon takes the (known) sentence text + the (already short, 6–10 s) audio clip, runs forced alignment in a background thread, and writes per-word `start`/`end` timings into a card field as JSON. Drop a small JS snippet into your card template and you get karaoke-style underlining of the active word as the audio plays — same UX as the langokee `Timestamp Sentence` model, but populated automatically from inside Migaku's normal capture flow instead of requiring a manual paste-text step.
+>
+> **Why this is interesting:** Migaku already has the sentence text and the trimmed audio. WhisperX's wav2vec2 alignment stage is the *reliable* part of ASR — it never invents words, only places known words against audio. On a 6–10 s clip this is **~1–3 s of CPU work** on Apple Silicon. So we get word timings essentially for free, asynchronously, after card creation. See **[Word Alignment (wav2vec2)](#word-alignment-wav2vec2)** below for full setup, the card-template snippet, language-detection behavior, and per-language notes (Chinese/Japanese/Korean align at character level — works fine, just produces one entry per character).
+>
+> **What's compatible:** all Migaku card types — Spanish, French, German, Italian, Portuguese, Dutch, Russian, Polish, Chinese Simplified, Chinese Traditional, Japanese, Korean, English, etc. The feature operates at the receiver level on the `sentence` + `sentenceAudio` fields, not on a specific note model. The language code drives which wav2vec2 model loads.
+>
+> **What did NOT change:** the original Migaku ↔ extension protocol, the existing card field mapping, the existing AnkiConnect endpoints, and every other addon feature. `wordTimings` is purely additive — disable it in settings and the addon behaves exactly like upstream.
+>
+> Branch: [`feat/wav2vec2-word-alignment`](https://github.com/hughgramel/Migaku-Anki-Addon-fork/tree/feat/wav2vec2-word-alignment). Upstream: [`migaku-official/Migaku-Anki-Addon`](https://github.com/migaku-official/Migaku-Anki-Addon).
+
+---
 
 Note: We renamed the pynput library to magicy in order to avoid Windows Real-time protection
 
